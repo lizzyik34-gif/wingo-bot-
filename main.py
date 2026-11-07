@@ -96,6 +96,7 @@ def check_updates():
                     text = result["message"]["text"].lower()
                     
                     if user_id not in ALLOWED_USER_IDS:
+                        print(f"👉 BLOCKED USER ID ATTEMPT: {user_id}")
                         send_message(chat_id, "⛔ Access Denied. This is a private bot.")
                         continue
                     
