@@ -8,13 +8,16 @@ from flask import Flask
 
 TOKEN = "9031056096:AAE92zjnhAGJDcsp79v3GiikwIAE2BQ03O8"
 
-# 🔒 SECURITY LOCK: Only allowed user IDs can access
-ALLOWED_USER_IDS = [8842031370,8882241036,7891601316]
+# 🔒 SECURITY LOCK: Allowed user IDs
+ALLOWED_USER_IDS = [8842031370, 8882241036, 7891601316]
 
-# 📊 GLOBAL STATS TRACKING
+# 📊 GLOBAL STATS & STAGE TRACKING
 total_predictions = 0
 total_wins = 0
 total_losses = 0
+
+# Progression system: Starts at Stage 1. If a round misses, it scales up to Stage 2 / Stage 3. Resets to Stage 1 on a win.
+current_stage = 1
 
 # --- MINI WEB SERVER FOR RENDER PORT CHECK ---
 app = Flask(__name__)
@@ -27,8 +30,8 @@ def run_web():
     app.run(host="0.0.0.0", port=10000)
 # ---------------------------------------------
 
-def generate_win_details():
-    global total_predictions, total_wins, total_losses
+def generate_prediction_with_stage():
+    global total_predictions, total_wins, total_losses, current_stage
     
     number = random.randint(0, 9)
     size = "Big" if number >= 5 else "Small"
@@ -42,15 +45,23 @@ def generate_win_details():
     else:
         color = "🔴 Red"
         
-    accuracy = random.randint(30, 100)
+    accuracy = random.randint(40, 95)
     
     total_predictions += 1
+    
+    # Simulate outcome tracking for stage progression
     if accuracy >= 50:
         total_wins += 1
+        # Reset back to Stage 1 on a win
+        current_stage = 1
+        outcome_status = "✅ Win (Target Hit)"
     else:
         total_losses += 1
-    
-    return number, size, color, accuracy
+        # Escalate stage on a loss (caps at Stage 3)
+        current_stage = min(current_stage + 1, 3)
+        outcome_status = "❌ Loss (Moving to Next Stage)"
+        
+    return number, size, color, accuracy, current_stage, outcome_status
 
 def get_1min_period():
     now = datetime.now(timezone.utc)
@@ -70,7 +81,7 @@ def send_message(chat_id, text):
 
 def check_updates():
     offset = 0
-    print("Bot loop active for 1-Minute WinGo mode with Win Rate percentages & Stats...")
+    print("Bot loop active with Stage Progression system...")
     while True:
         try:
             url = f"https://api.telegram.org/bot{TOKEN}/getUpdates?offset={offset}&timeout=30"
@@ -90,44 +101,45 @@ def check_updates():
                     
                     if text.startswith("/result"):
                         period = get_1min_period()
-                        number, size, color, accuracy = generate_win_details()
+                        number, size, color, accuracy, stage, status = generate_prediction_with_stage()
+                        
                         response_text = (
-                            f"📊 **WIN GO 1-MIN RESULT**\n\n"
+                            f"📊 **WIN GO 1-MIN SIGNAL**\n\n"
                             f"🔹 **Period:** `{period}`\n"
-                            f"🔹 **Number:** `{number}`\n"
-                            f"🔹 **Result:** **{size}**\n"
+                            f"📈 **Current Level:** `Stage {stage}`\n"
+                            f"🔹 **Number Prediction:** `{number}`\n"
+                            f"🔹 **Size:** **{size}**\n"
                             f"🔹 **Color:** {color}\n"
-                            f"🔥 **Win Rate:** `{accuracy}%`\n"
+                            f"🔥 **Confidence Rate:** `{accuracy}%`\n"
                         )
                         send_message(chat_id, response_text)
 
                     elif text.startswith("/stats"):
                         win_percentage = (total_wins / total_predictions * 100) if total_predictions > 0 else 0
                         stats_text = (
-                            f"📈 **FB999 1-MIN LIVE STATISTICS**\n\n"
+                            f"📈 **LIVE STATISTICS & PROGRESSION**\n\n"
                             f"📌 **Total Rounds:** `{total_predictions}`\n"
                             f"✅ **Total Wins:** `{total_wins}`\n"
                             f"❌ **Total Losses:** `{total_losses}`\n"
-                            f"🎯 **Success Rate:** `{win_percentage:.1f}%`"
+                            f"🎯 **Success Rate:** `{win_percentage:.1f}%`\n"
+                            f"🔄 **Active Stage:** `Stage {current_stage}`"
                         )
                         send_message(chat_id, stats_text)
 
                     elif text.startswith("/start"):
                         send_message(
                             chat_id, 
-                            "👋 **Welcome!**\n\n"
-                            "Send `/result` to get your 1-Minute WinGo Prediction.\n"
-                            "Send `/stats` to view your wins and losses records."
+                            "👋 **Welcome to Odogwudave Bot!**\n\n"
+                            "Send `/result` to get your 1-Minute WinGo Prediction with automated **Stage Progression**.\n"
+                            "Send `/stats` to view performance tracking."
                         )
         except Exception as e:
             print("Network glitch, retrying in 5 seconds...")
             time.sleep(5)
 
 if __name__ == "__main__":
-    # Start Flask web server in a background thread so Render's port check passes
     t = threading.Thread(target=run_web)
     t.daemon = True
     t.start()
     
-    # Start the Telegram bot polling loop
     check_updates()
