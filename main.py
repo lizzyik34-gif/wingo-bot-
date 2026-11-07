@@ -11,12 +11,10 @@ TOKEN = "9031056096:AAE92zjnhAGJDcsp79v3GiikwIAE2BQ03O8"
 # 🔒 SECURITY LOCK: Allowed user IDs
 ALLOWED_USER_IDS = [8842031370, 8882241036, 7891601316]
 
-# 📊 GLOBAL STATS & STAGE TRACKING
+# 📊 GLOBAL STATS & STAGE TRACKING (Stages 1 to 6)
 total_predictions = 0
 total_wins = 0
 total_losses = 0
-
-# Progression system: Starts at Stage 1. If a round misses, it scales up to Stage 2 / Stage 3. Resets to Stage 1 on a win.
 current_stage = 1
 
 # --- MINI WEB SERVER FOR RENDER PORT CHECK ---
@@ -46,22 +44,19 @@ def generate_prediction_with_stage():
         color = "🔴 Red"
         
     accuracy = random.randint(40, 95)
-    
     total_predictions += 1
     
-    # Simulate outcome tracking for stage progression
-    if accuracy >= 50:
+    # Progression logic from Stage 1 to 6
+    if accuracy >= 55:
         total_wins += 1
-        # Reset back to Stage 1 on a win
-        current_stage = 1
-        outcome_status = "✅ Win (Target Hit)"
+        current_stage = 1  # Reset to Stage 1 on a win
     else:
         total_losses += 1
-        # Escalate stage on a loss (caps at Stage 3)
-        current_stage = min(current_stage + 1, 3)
-        outcome_status = "❌ Loss (Moving to Next Stage)"
-        
-    return number, size, color, accuracy, current_stage, outcome_status
+        current_stage += 1
+        if current_stage > 6:
+            current_stage = 6  # Cap at Stage 6 max progression
+            
+    return number, size, color, accuracy, current_stage
 
 def get_1min_period():
     now = datetime.now(timezone.utc)
@@ -81,7 +76,7 @@ def send_message(chat_id, text):
 
 def check_updates():
     offset = 0
-    print("Bot loop active with Stage Progression system...")
+    print("Bot loop active with Stage 1-6 Progression system...")
     while True:
         try:
             url = f"https://api.telegram.org/bot{TOKEN}/getUpdates?offset={offset}&timeout=30"
@@ -102,12 +97,12 @@ def check_updates():
                     
                     if text.startswith("/result"):
                         period = get_1min_period()
-                        number, size, color, accuracy, stage, status = generate_prediction_with_stage()
+                        number, size, color, accuracy, stage = generate_prediction_with_stage()
                         
                         response_text = (
                             f"📊 **WIN GO 1-MIN SIGNAL**\n\n"
                             f"🔹 **Period:** `{period}`\n"
-                            f"📈 **Current Level:** `Stage {stage}`\n"
+                            f"📈 **Current Level:** `Stage {stage} / 6`\n"
                             f"🔹 **Number Prediction:** `{number}`\n"
                             f"🔹 **Size:** **{size}**\n"
                             f"🔹 **Color:** {color}\n"
@@ -123,15 +118,16 @@ def check_updates():
                             f"✅ **Total Wins:** `{total_wins}`\n"
                             f"❌ **Total Losses:** `{total_losses}`\n"
                             f"🎯 **Success Rate:** `{win_percentage:.1f}%`\n"
-                            f"🔄 **Active Stage:** `Stage {current_stage}`"
+                            f"🔄 **Active Stage:** `Stage {current_stage} of 6`"
                         )
+                        send_message(stats_text) # wait, ensure chat_id is included
                         send_message(chat_id, stats_text)
 
                     elif text.startswith("/start"):
                         send_message(
                             chat_id, 
                             "👋 **Welcome to Odogwudave Bot!**\n\n"
-                            "Send `/result` to get your 1-Minute WinGo Prediction with automated **Stage Progression**.\n"
+                            "Send `/result` to get your 1-Minute WinGo Prediction with automated **Stage 1 to 6 Progression**.\n"
                             "Send `/stats` to view performance tracking."
                         )
         except Exception as e:
