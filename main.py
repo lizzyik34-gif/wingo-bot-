@@ -3,6 +3,8 @@ import urllib.request
 import json
 import time
 from datetime import datetime, timezone
+import threading
+from flask import Flask
 
 TOKEN = "9031056096:AAE92zjnhAGJDcsp79v3GiikwIAE2BQ03O8"
 
@@ -13,6 +15,17 @@ ALLOWED_USER_IDS = [8842031370, 987654321]
 total_predictions = 0
 total_wins = 0
 total_losses = 0
+
+# --- MINI WEB SERVER FOR RENDER PORT CHECK ---
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot is active and running 24/7!"
+
+def run_web():
+    app.run(host="0.0.0.0", port=10000)
+# ---------------------------------------------
 
 def generate_win_details():
     global total_predictions, total_wins, total_losses
@@ -29,10 +42,8 @@ def generate_win_details():
     else:
         color = "🔴 Red"
         
-    # Generate random win rate percentage between 30% and 100%
     accuracy = random.randint(30, 100)
     
-    # Automatically tally wins and losses based on accuracy threshold
     total_predictions += 1
     if accuracy >= 50:
         total_wins += 1
@@ -91,7 +102,6 @@ def check_updates():
                         send_message(chat_id, response_text)
 
                     elif text.startswith("/stats"):
-                        # Calculate win percentage safely to prevent division by zero
                         win_percentage = (total_wins / total_predictions * 100) if total_predictions > 0 else 0
                         stats_text = (
                             f"📈 **FB999 1-MIN LIVE STATISTICS**\n\n"
@@ -114,4 +124,10 @@ def check_updates():
             time.sleep(5)
 
 if __name__ == "__main__":
+    # Start Flask web server in a background thread so Render's port check passes
+    t = threading.Thread(target=run_web)
+    t.daemon = True
+    t.start()
+    
+    # Start the Telegram bot polling loop
     check_updates()
